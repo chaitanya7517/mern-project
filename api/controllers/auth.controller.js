@@ -1,14 +1,40 @@
-import User from '../models/user.model.js'
-import bcryptjs from 'bcryptjs'
+import User from "../models/user.model.js";
+import bcryptjs from "bcryptjs";
+import { errorHandler } from "../utils/error.js";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+dotenv.config();
 
-export const signup = async (req,res,next) => {
+export const signup = async (req, res, next) => {
   const { username, email, password } = req.body;
   const hashedPassword = await bcryptjs.hash(password, 10);
-  
-  try{
-    const newUser = await User.create({username,email,password:hashedPassword,});
-    res.status(201).json('User Created Successfully')
-  }catch(error) {
-    next(error)
+
+  try {
+    const newUser = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+    });
+    res.status(201).json("User Created Successfully");
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const signin = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const validUser = await User.findOne({ email });
+    if (!validUser) return next(errorHandler(404, "User not found!"));
+    const validPassword = await bcryptjs.compare(password, validUser.password);
+    if (!validPassword) return next(errorHandler(401, "Wrong credentials!"));
+    const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET);
+    const {password:pass, ...rest} = validUser._doc;
+    res
+      .cookie("access_token", token, { httpOnly: true })
+      .status(200)
+      .json(rest);
+  } catch (error) {
+    next(error);
   }
 };
